@@ -14,10 +14,9 @@
       align-items:center;
       justify-content:center;
       font-family:sans-serif;
-      font-size:12px;
+      text-align:center;
       cursor:pointer;
       user-select:none;
-      text-align:center;
     }
     .circle, .circle * {
       user-select: none;
@@ -63,46 +62,138 @@
       { subject: 'physics', date: '2025-08-28', description: 'Practical Exam' },
       { subject: 'chem',    date: '2025-09-04', description: 'Practical Exam' }
     ];
-    const container = document.getElementById('container');
-    const cue = document.createElement('div'); cue.id = 'cue'; container.appendChild(cue);
-    let W = container.clientWidth, H = container.clientHeight;
-    window.addEventListener('resize', ()=>{ W = container.clientWidth; H = container.clientHeight; });
 
-    // HSL-to-RGB + luminance
-    function hslToRgb(h,s,l){ s/=100; l/=100; const c=(1-Math.abs(2*l-1))*s; const x=c*(1-Math.abs((h/60)%2-1)); const m=l-c/2; let r1=0,g1=0,b1=0;
-      if(h<60){r1=c;g1=x;}else if(h<120){r1=x;g1=c;}else if(h<180){g1=c;b1=x;}else if(h<240){g1=x;b1=c;}else if(h<300){r1=x;b1=c;}else{r1=c;b1=x;}
-      return {r:Math.round((r1+m)*255),g:Math.round((g1+m)*255),b:Math.round((b1+m)*255)};
+    const container = document.getElementById('container');
+    const cue = document.createElement('div');
+    cue.id = 'cue';
+    container.appendChild(cue);
+
+    let W = container.clientWidth, H = container.clientHeight;
+    window.addEventListener('resize', () => { W = container.clientWidth; H = container.clientHeight; });
+
+    // HSL-to-RGB + luminance helper
+    function hslToRgb(h,s,l){ s/=100; l/=100; const c=(1-Math.abs(2*l-1))*s; const x=c*(1-Math.abs((h/60)%2-1)); const m=l-c/2;
+      let r1=0,g1=0,b1=0;
+      if(h<60){r1=c;g1=x;} else if(h<120){r1=x;g1=c;} else if(h<180){g1=c;b1=x;}
+      else if(h<240){g1=x;b1=c;} else if(h<300){r1=x;b1=c;} else {r1=c;b1=x;}
+      return { r:Math.round((r1+m)*255), g:Math.round((g1+m)*255), b:Math.round((b1+m)*255) };
     }
+
     // assign consistent HSL per subject
     const colCache = {};
-    function subjectColor(sub){ if(colCache[sub]) return colCache[sub]; let hash=0; for(let c of sub) hash=(hash*31+c.charCodeAt(0))%360; return colCache[sub]={h:hash,s:70,l:50}; }
-    // size mapping
-    function rForDays(d,maxD){ const minR=50,maxR=120; const t=Math.max(0,(maxD-d)/maxD); return minR+(maxR-minR)*t*t; }
-    const FRICTION=0.98, circles=[]; let aimBall=null;
+    function subjectColor(sub){
+      if(colCache[sub]) return colCache[sub];
+      let hash = 0;
+      for(let c of sub) hash = (hash*31 + c.charCodeAt(0)) % 360;
+      return colCache[sub] = { h: hash, s: 70, l: 50 };
+    }
 
-    (function init(){ const now=Date.now(); let maxDays=0;
-      exams.forEach(e=>{ e.days=Math.max(0,Math.ceil((new Date(e.date)-now)/(1000*60*60*24))); maxDays=Math.max(maxDays,e.days); });
-      exams.forEach(e=>{
-        const r=rForDays(e.days,maxDays);
-        const div=document.createElement('div'); div.className='circle'; div.style.width=div.style.height=2*r+'px';
-        const hsl=subjectColor(e.subject); div.style.background=`hsl(${hsl.h},${hsl.s}%,${hsl.l}%)`;
-        const {r:rr,g:gg,b:bb}=hslToRgb(hsl.h,hsl.s,hsl.l);
-        div.style.color=((0.2126*rr+0.7152*gg+0.0722*bb)/255<0.5)?'#fff':'#000';
-        div.innerHTML=`<div>${e.subject}</div><div>${e.date}</div><div>${e.description}</div><div>${e.days}d</div>`;
+    // exponential size mapping
+    function rForDays(days,maxDays){
+      const minR=50, maxR=120;
+      const t=Math.max(0,(maxDays-days)/maxDays);
+      return minR + (maxR-minR)*t*t;
+    }
+
+    const FRICTION = 0.98;
+    const circles = [];
+    let aimBall = null;
+
+    (function init(){
+      const now = Date.now();
+      let maxDays = 0;
+      // compute days and find max, skip past exams
+      const future = exams.map(e => {
+        const diff = Math.ceil((new Date(e.date) - now)/(1000*60*60*24));
+        if(diff < 0) return null;
+        e.days = diff;
+        maxDays = Math.max(maxDays, diff);
+        return e;
+      }).filter(e => e);
+
+      future.forEach(e => {
+        const r = rForDays(e.days, maxDays);
+        const div = document.createElement('div');
+        div.className = 'circle';
+        // size & styling
+        div.style.width = div.style.height = 2*r + 'px';
+        // dynamic font-size & padding
+        const fontSize = r/4;
+        div.style.fontSize = fontSize + 'px';
+        div.style.padding = (r * 0.1) + 'px';
+
+        // color & contrast
+        const hsl = subjectColor(e.subject);
+        div.style.background = `hsl(${hsl.h},${hsl.s}%,${hsl.l}%)`;
+        const {r:rr,g:gg,b:bb} = hslToRgb(hsl.h,hsl.s,hsl.l);
+        const lum = (0.2126*rr + 0.7152*gg + 0.0722*bb)/255;
+        div.style.color = lum<0.5 ? '#fff' : '#000';
+
+        div.innerHTML = `
+          <div>${e.subject}</div>
+          <div>${e.date}</div>
+          <div>${e.description}</div>
+          <div>${e.days}d</div>
+        `;
+
         container.appendChild(div);
-        circles.push({el:div,x:Math.random()*(W-2*r)+r,y:Math.random()*(H-2*r)+r,vx:0,vy:0,r});
+        // initial physics
+        circles.push({ el: div, x: Math.random()*(W-2*r)+r, y: Math.random()*(H-2*r)+r, vx:0, vy:0, r });
       });
-      container.addEventListener('mousedown',ev=>{ const mx=ev.clientX-container.offsetLeft, my=ev.clientY-container.offsetTop; circles.forEach(c=>{ if(Math.hypot(mx-c.x,my-c.y)<c.r) aimBall=c; });});
-      container.addEventListener('mousemove',ev=>{ if(!aimBall) return; const mx=ev.clientX-container.offsetLeft, my=ev.clientY-container.offsetTop; const dx=mx-aimBall.x, dy=my-aimBall.y; const dist=Math.hypot(dx,dy), angle=Math.atan2(dy,dx);
-        cue.style.display='block'; cue.style.width=dist+'px'; cue.style.transform=`translate(${aimBall.x}px,${aimBall.y}px) rotate(${angle}rad)`; });
-      container.addEventListener('mouseup',ev=>{ if(!aimBall) return; const mx=ev.clientX-container.offsetLeft, my=ev.clientY-container.offsetTop; const dx=mx-aimBall.x, dy=my-aimBall.y; const power=0.2; aimBall.vx=-dx*power; aimBall.vy=-dy*power; cue.style.display='none'; aimBall=null; });
+
+      // pool cue events
+      container.addEventListener('mousedown', ev => {
+        const mx = ev.clientX - container.offsetLeft, my = ev.clientY - container.offsetTop;
+        circles.forEach(c => { if(Math.hypot(mx-c.x,my-c.y)<c.r) aimBall=c; });
+      });
+      container.addEventListener('mousemove', ev => {
+        if(!aimBall) return;
+        const mx = ev.clientX - container.offsetLeft, my = ev.clientY - container.offsetTop;
+        const dx = mx - aimBall.x, dy = my - aimBall.y;
+        const dist = Math.hypot(dx,dy), angle = Math.atan2(dy,dx);
+        cue.style.display = 'block';
+        cue.style.width = dist + 'px';
+        cue.style.transform = `translate(${aimBall.x}px,${aimBall.y}px) rotate(${angle}rad)`;
+      });
+      container.addEventListener('mouseup', ev => {
+        if(!aimBall) return;
+        const mx = ev.clientX - container.offsetLeft, my = ev.clientY - container.offsetTop;
+        const dx = mx - aimBall.x, dy = my - aimBall.y;
+        aimBall.vx = -dx * 0.2;
+        aimBall.vy = -dy * 0.2;
+        cue.style.display = 'none';
+        aimBall = null;
+      });
+
       requestAnimationFrame(loop);
     })();
-    function loop(){ circles.forEach(c=>{ if(c!==aimBall){ c.vx*=FRICTION; c.vy*=FRICTION; c.x+=c.vx; c.y+=c.vy; }
-        if(c.x-c.r<0){c.x=c.r; c.vx*=-1;} if(c.x+c.r>W){c.x=W-c.r;c.vx*=-1;} if(c.y-c.r<0){c.y=c.r;c.vy*=-1;} if(c.y+c.r>H){c.y=H-c.r;c.vy*=-1;}
+
+    function loop(){
+      circles.forEach(c=>{
+        if(c!==aimBall){ c.vx*=FRICTION; c.vy*=FRICTION; c.x+=c.vx; c.y+=c.vy; }
+        // wall bounce
+        if(c.x-c.r<0){c.x=c.r; c.vx*=-1;} if(c.x+c.r>W){c.x=W-c.r; c.vx*=-1;}
+        if(c.y-c.r<0){c.y=c.r; c.vy*=-1;} if(c.y+c.r>H){c.y=H-c.r; c.vy*=-1;}
       });
-      for(let i=0;i<circles.length;i++){for(let j=i+1;j<circles.length;j++){const A=circles[i],B=circles[j]; if(A===aimBall||B===aimBall) continue; const dx=B.x-A.x,dy=B.y-A.y,dist=Math.hypot(dx,dy),minD=A.r+B.r; if(dist<minD){const overlap=(minD-dist)/2,nx=dx/dist,ny=dy/dist;A.x-=nx*overlap;A.y-=ny*overlap;B.x+=nx*overlap;B.y+=ny*overlap; const pa=A.vx*nx+A.vy*ny,pb=B.vx*nx+B.vy*ny;A.vx+=(pb-pa)*nx;A.vy+=(pb-pa)*ny;B.vx+=(pa-pb)*nx;B.vy+=(pa-pb)*ny;}}}
-      circles.forEach(c=>{c.el.style.transform=`translate(${c.x-c.r}px,${c.y-c.r}px)`;}); requestAnimationFrame(loop); }
+      // collisions
+      for(let i=0;i<circles.length;i++){
+        for(let j=i+1;j<circles.length;j++){
+          const A=circles[i], B=circles[j]; if(A===aimBall||B===aimBall) continue;
+          const dx=B.x-A.x, dy=B.y-A.y;
+          const dist=Math.hypot(dx,dy), minD=A.r+B.r;
+          if(dist<minD){
+            const overlap=(minD-dist)/2, nx=dx/dist, ny=dy/dist;
+            A.x-=nx*overlap; A.y-=ny*overlap;
+            B.x+=nx*overlap; B.y+=ny*overlap;
+            const pa=A.vx*nx + A.vy*ny, pb=B.vx*nx + B.vy*ny;
+            A.vx+=(pb-pa)*nx; A.vy+=(pb-pa)*ny;
+            B.vx+=(pa-pb)*nx; B.vy+=(pa-pb)*ny;
+          }
+        }
+      }
+      circles.forEach(c=>{ c.el.style.transform = `translate(${c.x-c.r}px,${c.y-c.r}px)`; });
+      requestAnimationFrame(loop);
+    }
   </script>
 </body>
 </html>
