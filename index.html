@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="UTF-8">
-  <title>Exam Tracker</title>
+  <title>what the helly</title>
   <style>
     html, body { margin:0; padding:0; height:100vh; overflow:hidden; }
     #container { position:relative; width:100%; height:100%; background:#fafafa; }
@@ -134,7 +135,7 @@
         circles.push({ el:div, days:e.days, vx:0, vy:0, r });
       });
 
-      // place nearest exam in center
+            // place nearest exam in center
       circles.sort((a,b)=>a.days - b.days);
       const center = circles[0];
       center.x = W/2; center.y = H/2;
@@ -149,38 +150,52 @@
         c.y = H/2 + ringR * Math.sin(ang);
       });
 
-      // cue events
-      container.addEventListener('mousedown', ev => {
-        const mx = ev.clientX - container.offsetLeft;
-        const my = ev.clientY - container.offsetTop;
+      // pointer event helpers
+      function getPos(e) {
+        const touch = e.touches ? e.touches[0] : e;
+        return {
+          x: touch.clientX - container.offsetLeft,
+          y: touch.clientY - container.offsetTop
+        };
+      }
+      function pointerDown(e) {
+        e.preventDefault();
+        const pos = getPos(e);
         circles.forEach(c => {
           const rad = c.el.offsetWidth/2;
-          if(Math.hypot(mx-c.x,my-c.y) < rad) aimBall = c;
+          if (Math.hypot(pos.x - c.x, pos.y - c.y) < rad) aimBall = c;
         });
-      });
-      container.addEventListener('mousemove', ev => {
-        if(!aimBall) return;
-        const mx = ev.clientX - container.offsetLeft;
-        const my = ev.clientY - container.offsetTop;
-        const dx = mx - aimBall.x;
-        const dy = my - aimBall.y;
-        const dist = Math.hypot(dx,dy);
-        const ang = Math.atan2(dy,dx);
+      }
+      function pointerMove(e) {
+        if (!aimBall) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        const dx = pos.x - aimBall.x;
+        const dy = pos.y - aimBall.y;
+        const dist = Math.hypot(dx, dy);
+        const ang = Math.atan2(dy, dx);
         cue.style.display = 'block';
-        cue.style.width = dist+'px';
+        cue.style.width = dist + 'px';
         cue.style.transform = `translate(${aimBall.x}px,${aimBall.y}px) rotate(${ang}rad)`;
-      });
-      container.addEventListener('mouseup', ev => {
-        if(!aimBall) return;
-        const mx = ev.clientX - container.offsetLeft;
-        const my = ev.clientY - container.offsetTop;
-        const dx = mx - aimBall.x;
-        const dy = my - aimBall.y;
+      }
+      function pointerUp(e) {
+        if (!aimBall) return;
+        e.preventDefault();
+        const pos = getPos(e);
+        const dx = pos.x - aimBall.x;
+        const dy = pos.y - aimBall.y;
         aimBall.vx = -dx * 0.2;
         aimBall.vy = -dy * 0.2;
         cue.style.display = 'none';
         aimBall = null;
-      });
+      }
+      // bind both mouse and touch
+      container.addEventListener('mousedown', pointerDown);
+      container.addEventListener('touchstart', pointerDown, {passive:false});
+      container.addEventListener('mousemove', pointerMove);
+      container.addEventListener('touchmove', pointerMove, {passive:false});
+      container.addEventListener('mouseup', pointerUp);
+      container.addEventListener('touchend', pointerUp, {passive:false});
 
       requestAnimationFrame(loop);
     })();
