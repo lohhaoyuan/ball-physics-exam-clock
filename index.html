@@ -3,7 +3,7 @@
 <head>
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="UTF-8">
-  <title>what the helly</title>
+  <title>what the</title>
   <style>
     html, body { margin:0; padding:0; height:100vh; overflow:hidden; }
     #container { position:relative; width:100%; height:100%; background:#fafafa; }
@@ -152,11 +152,19 @@
 
       // pointer event helpers
       function getPos(e) {
-        const touch = e.touches ? e.touches[0] : e;
+        let touch;
+        if (e.touches && e.touches.length > 0) {
+          touch = e.touches[0];
+        } else if (e.changedTouches && e.changedTouches.length > 0) {
+          touch = e.changedTouches[0];
+        } else {
+          touch = e;
+        }
         return {
           x: touch.clientX - container.offsetLeft,
           y: touch.clientY - container.offsetTop
         };
+      };
       }
       function pointerDown(e) {
         e.preventDefault();
