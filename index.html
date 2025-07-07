@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>what</title>
+  <title>Exam Tracker</title>
   <style>
     html, body { margin:0; padding:0; height:100vh; overflow:hidden; }
     #container { position:relative; width:100%; height:100%; background:#fafafa; }
@@ -98,7 +98,7 @@
       const days = future.map(e=>e.days);
       const minDays = Math.min(...days), maxDays = Math.max(...days);
       const spanDays = maxDays - minDays;
-      const exponent = 3;
+      
       // min/max radius
       const maxR = Math.min(W,H)/8;
       const minR = maxR/4;
@@ -106,7 +106,7 @@
       // create circles
       future.forEach(e=>{
         const f = spanDays>0 ? (maxDays - e.days)/spanDays : 1;
-        const innerR = minR + (maxR - minR) * Math.pow(f, exponent);
+        const innerR = minR + (maxR - minR) * f;
         const pad = innerR * 0.1;
         const r = innerR + pad;
         const div=document.createElement('div'); div.className='circle';
