@@ -1,9 +1,9 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta charset="UTF-8">
-  <title>what the</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>cooked</title>
   <style>
     html, body { margin:0; padding:0; height:100vh; overflow:hidden; }
     #container { position:relative; width:100%; height:100%; background:#fafafa; }
@@ -16,11 +16,9 @@
       justify-content:center;
       font-family:sans-serif;
       text-align:center;
-      cursor:pointer;
       user-select:none;
       box-sizing:content-box;
     }
-    .circle, .circle * { user-select:none; -webkit-user-select:none; -ms-user-select:none; }
     .circle:active { cursor:grabbing; }
     #cue {
       position:absolute;
@@ -33,11 +31,7 @@
     #cue::after {
       content:"";
       position:absolute;
-      right:0;
-      top:50%;
-      transform:translateY(-50%);
-      width:0;
-      height:0;
+      right:0; top:50%; transform:translateY(-50%);
       border-left:8px solid #000;
       border-top:6px solid transparent;
       border-bottom:6px solid transparent;
@@ -47,7 +41,6 @@
 <body>
   <div id="container"></div>
   <script>
-    // exam definitions
     const exams = [
       {subject:'ss',date:'2025-07-03',description:'Stage 2'},
       {subject:'history',date:'2025-07-10',description:'CT'},
@@ -62,192 +55,126 @@
     ];
 
     const container = document.getElementById('container');
-    const cue = document.createElement('div'); cue.id = 'cue'; container.appendChild(cue);
+    const cue = document.createElement('div');
+    cue.id = 'cue'; container.appendChild(cue);
 
     let W = container.clientWidth, H = container.clientHeight;
-    window.addEventListener('resize', ()=>{ W = container.clientWidth; H = container.clientHeight; });
+    window.addEventListener('resize', () => { W = container.clientWidth; H = container.clientHeight; });
 
-    // convert HSL to RGB for luminance
-    function hslToRgb(h, s, l) {
-      s/=100; l/=100;
-      const c = (1 - Math.abs(2*l - 1)) * s;
-      const x = c * (1 - Math.abs((h/60)%2 - 1));
-      const m = l - c/2;
-      let r1=0, g1=0, b1=0;
-      if(h<60){r1=c;g1=x;} else if(h<120){r1=x;g1=c;} else if(h<180){g1=c; b1=x;}
-      else if(h<240){g1=x; b1=c;} else if(h<300){r1=x; b1=c;} else {r1=c; b1=x;}
-      return { r:Math.round((r1+m)*255), g:Math.round((g1+m)*255), b:Math.round((b1+m)*255) };
-    }
+    function hslToRgb(h,s,l) { s/=100; l/=100; const c=(1-Math.abs(2*l-1))*s; const x=c*(1-Math.abs((h/60)%2-1)); const m=l-c/2;
+      let r=0,g=0,b=0;
+      if(h<60){r=c;g=x;}else if(h<120){r=x;g=c;}else if(h<180){g=c;b=x;}else if(h<240){g=x;b=c;}else if(h<300){r=x;b=c;}else{r=c;b=x;}
+      return {r:Math.round((r+m)*255),g:Math.round((g+m)*255),b:Math.round((b+m)*255)}; }
 
-    // pastel rainbow subject colors
     const pastelHues = [0,30,60,120,180,240,300];
-    const pastelMap = {};
-    let pastelIndex = 0;
+    const pastelMap = {}; let pastelIndex=0;
     function subjectColor(sub) {
       if(pastelMap[sub]) return pastelMap[sub];
       let color;
       if(pastelIndex < pastelHues.length) {
-        color = { h: pastelHues[pastelIndex], s:60, l:85 };
-        pastelIndex++;
+        color = {h:pastelHues[pastelIndex++], s:60, l:85};
       } else {
         let hash=0; for(let c of sub) hash=(hash*31+c.charCodeAt(0))%360;
-        color = { h:hash, s:70, l:50 };
+        color = {h:hash, s:70, l:50};
       }
-      pastelMap[sub] = color;
+      pastelMap[sub]=color;
       return color;
     }
 
-    const FRICTION = 0.98;
-    const circles = [];
-    let aimBall = null;
+    const FRICTION=0.98;
+    const circles=[];
+    let aimBall=null;
+
+    function getPos(e) {
+      const rect=container.getBoundingClientRect();
+      let x,y;
+      if(e.touches && e.touches[0]) {
+        x = e.touches[0].clientX;
+        y = e.touches[0].clientY;
+      } else if(e.changedTouches && e.changedTouches[0]) {
+        x = e.changedTouches[0].clientX;
+        y = e.changedTouches[0].clientY;
+      } else {
+        x = e.clientX; y = e.clientY;
+      }
+      return { x: x-rect.left, y: y-rect.top };
+    }
 
     (function init(){
       const now = Date.now();
       const future = exams.map(e=>{ const d=Math.ceil((new Date(e.date)-now)/(1000*60*60*24)); e.days=d; return d>=0?e:null; }).filter(e=>e);
       if(!future.length) return;
+      const days=future.map(e=>e.days);
+      const minDays=Math.min(...days), maxDays=Math.max(...days), span=maxDays-minDays;
+      const maxR=Math.min(W,H)/8, minR=maxR/2;
 
-      const days = future.map(e=>e.days);
-      const minDays = Math.min(...days), maxDays = Math.max(...days);
-      const span = maxDays - minDays;
-
-      const maxR = Math.min(W, H) / 8;
-      const minR = maxR/2;
-
-      future.forEach(e => {
-        const f = span>0 ? (maxDays - e.days)/span : 1;
-        const innerR = minR + (maxR - minR) * f;
+      future.forEach(e=>{
+        const f = span>0?(maxDays-e.days)/span:1;
+        const innerR = minR + (maxR-minR)*f;
         const pad = innerR*0.1;
-        const r = innerR + pad;
+        const r = innerR+pad;
 
-        const div = document.createElement('div');
-        div.className = 'circle';
-        div.style.width = div.style.height = (2*r)+'px';
-        div.style.padding = pad+'px';
-        div.style.fontSize = (innerR/4)+'px';
+        const div=document.createElement('div');
+        div.className='circle';
+        div.style.width=div.style.height=(2*r)+'px';
+        div.style.padding=pad+'px';
+        div.style.fontSize=(innerR/4)+'px';
 
         const hsl = subjectColor(e.subject);
         div.style.background = `hsl(${hsl.h},${hsl.s}%,${hsl.l}%)`;
         const {r:rr,g:gg,b:bb} = hslToRgb(hsl.h,hsl.s,hsl.l);
-        div.style.color = ((0.2126*rr + 0.7152*gg + 0.0722*bb)/255 < 0.5) ? '#fff' : '#000';
+        div.style.color = ((0.2126*rr+0.7152*gg+0.0722*bb)/255<0.5)?'#fff':'#000';
 
-        div.innerHTML = `<div>${e.subject}</div><div>${e.date}</div><div>${e.description}</div><div>${e.days}d</div>`;
+        div.innerHTML=`<div>${e.subject}</div><div>${e.date}</div><div>${e.description}</div><div>${e.days}d</div>`;
         container.appendChild(div);
-        circles.push({ el:div, days:e.days, vx:0, vy:0, r });
+        circles.push({el:div,days:e.days,vx:0,vy:0,r});
       });
 
-            // place nearest exam in center
-      circles.sort((a,b)=>a.days - b.days);
-      const center = circles[0];
-      center.x = W/2; center.y = H/2;
-
-      // ring others around
-      const others = circles.slice(1);
-      const outerMax = Math.max(...others.map(c=>c.r));
-      const ringR = center.r + outerMax + 20;
+      // position circles
+      circles.sort((a,b)=>a.days-b.days);
+      const center=circles[0];
+      center.x=W/2; center.y=H/2;
+      const others=circles.slice(1);
+      const outerMax=Math.max(...others.map(c=>c.r));
+      const ringR=center.r+outerMax+20;
       others.forEach((c,i)=>{
-        const ang = 2*Math.PI * i/others.length;
-        c.x = W/2 + ringR * Math.cos(ang);
-        c.y = H/2 + ringR * Math.sin(ang);
+        const ang=2*Math.PI*i/others.length;
+        c.x=W/2+ringR*Math.cos(ang);
+        c.y=H/2+ringR*Math.sin(ang);
       });
 
-      // pointer event helpers
-      function getPos(e) {
-        let touch;
-        if (e.touches && e.touches.length > 0) {
-          touch = e.touches[0];
-        } else if (e.changedTouches && e.changedTouches.length > 0) {
-          touch = e.changedTouches[0];
-        } else {
-          touch = e;
-        }
-        return {
-          x: touch.clientX - container.offsetLeft,
-          y: touch.clientY - container.offsetTop
-        };
-      };
-      }
-      function pointerDown(e) {
-        e.preventDefault();
-        const pos = getPos(e);
-        circles.forEach(c => {
-          const rad = c.el.offsetWidth/2;
-          if (Math.hypot(pos.x - c.x, pos.y - c.y) < rad) aimBall = c;
-        });
-      }
-      function pointerMove(e) {
-        if (!aimBall) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        const dx = pos.x - aimBall.x;
-        const dy = pos.y - aimBall.y;
-        const dist = Math.hypot(dx, dy);
-        const ang = Math.atan2(dy, dx);
-        cue.style.display = 'block';
-        cue.style.width = dist + 'px';
-        cue.style.transform = `translate(${aimBall.x}px,${aimBall.y}px) rotate(${ang}rad)`;
-      }
-      function pointerUp(e) {
-        if (!aimBall) return;
-        e.preventDefault();
-        const pos = getPos(e);
-        const dx = pos.x - aimBall.x;
-        const dy = pos.y - aimBall.y;
-        aimBall.vx = -dx * 0.2;
-        aimBall.vy = -dy * 0.2;
-        cue.style.display = 'none';
-        aimBall = null;
-      }
-      // bind both mouse and touch
-      container.addEventListener('mousedown', pointerDown);
-      container.addEventListener('touchstart', pointerDown, {passive:false});
-      container.addEventListener('mousemove', pointerMove);
-      container.addEventListener('touchmove', pointerMove, {passive:false});
-      container.addEventListener('mouseup', pointerUp);
-      container.addEventListener('touchend', pointerUp, {passive:false});
+      // input events
+      function pointerDown(e){ e.preventDefault(); const pos=getPos(e); circles.forEach(c=>{ const rad=c.el.offsetWidth/2; if(Math.hypot(pos.x-c.x,pos.y-c.y)<rad) aimBall=c; }); }
+      function pointerMove(e){ if(!aimBall) return; e.preventDefault(); const pos=getPos(e); const dx=pos.x-aimBall.x, dy=pos.y-aimBall.y; const dist=Math.hypot(dx,dy), ang=Math.atan2(dy,dx); cue.style.display='block'; cue.style.width=dist+'px'; cue.style.transform=`translate(${aimBall.x}px,${aimBall.y}px) rotate(${ang}rad)`; }
+      function pointerUp(e){ if(!aimBall) return; e.preventDefault(); const pos=getPos(e); const dx=pos.x-aimBall.x, dy=pos.y-aimBall.y; aimBall.vx=-dx*0.2; aimBall.vy=-dy*0.2; cue.style.display='none'; aimBall=null; }
+      ['mousedown','touchstart'].forEach(evt=>container.addEventListener(evt,pointerDown,{passive:false}));
+      ['mousemove','touchmove'].forEach(evt=>container.addEventListener(evt,pointerMove,{passive:false}));
+      ['mouseup','touchend'].forEach(evt=>container.addEventListener(evt,pointerUp,{passive:false}));
 
       requestAnimationFrame(loop);
     })();
 
     function loop(){
       circles.forEach(c=>{
-        if(c!==aimBall){ c.vx *= FRICTION; c.vy *= FRICTION; c.x += c.vx; c.y += c.vy; }
-        // wall bounce
-        const rad = c.el.offsetWidth/2;
-        if(c.x-rad < 0){ c.x = rad; c.vx *= -1; }
-        if(c.x+rad > W){ c.x = W - rad; c.vx *= -1; }
-        if(c.y-rad < 0){ c.y = rad; c.vy *= -1; }
-        if(c.y+rad > H){ c.y = H - rad; c.vy *= -1; }
+        if(c!==aimBall){ c.vx*=FRICTION; c.vy*=FRICTION; c.x+=c.vx; c.y+=c.vy; }
+        const rad=c.el.offsetWidth/2;
+        if(c.x-rad<0){c.x=rad; c.vx*=-1;} if(c.x+rad>W){c.x=W-rad; c.vx*=-1;}
+        if(c.y-rad<0){c.y=rad; c.vy*=-1;} if(c.y+rad>H){c.y=H-rad; c.vy*=-1;}
       });
-      // collisions
       for(let i=0;i<circles.length;i++){
         for(let j=i+1;j<circles.length;j++){
-          const A = circles[i], B = circles[j]; if(A===aimBall||B===aimBall) continue;
-          const radA = A.el.offsetWidth/2, radB = B.el.offsetWidth/2;
-          const dx = B.x - A.x;
-          const dy = B.y - A.y;
-          const dist = Math.hypot(dx,dy);
-          const minDist = radA + radB;
-          if(dist < minDist){
-            const overlap = (minDist - dist)/2;
-            const nx = dx/dist;
-            const ny = dy/dist;
-            A.x -= nx * overlap;
-            A.y -= ny * overlap;
-            B.x += nx * overlap;
-            B.y += ny * overlap;
-            const pa = A.vx*nx + A.vy*ny;
-            const pb = B.vx*nx + B.vy*ny;
-            A.vx += (pb - pa)*nx;
-            A.vy += (pb - pa)*ny;
-            B.vx += (pa - pb)*nx;
-            B.vy += (pa - pb)*ny;
+          const A=circles[i], B=circles[j]; if(A===aimBall||B===aimBall) continue;
+          const radA=A.el.offsetWidth/2, radB=B.el.offsetWidth/2;
+          const dx=B.x-A.x, dy=B.y-A.y;
+          const dist=Math.hypot(dx,dy), minD=radA+radB;
+          if(dist<minD){ const ov=(minD-dist)/2, nx=dx/dist, ny=dy/dist;
+            A.x-=nx*ov; A.y-=ny*ov; B.x+=nx*ov; B.y+=ny*ov;
+            const pa=A.vx*nx+A.vy*ny, pb=B.vx*nx+B.vy*ny;
+            A.vx+=(pb-pa)*nx; A.vy+=(pb-pa)*ny; B.vx+=(pa-pb)*nx; B.vy+=(pa-pb)*ny;
           }
         }
       }
-      circles.forEach(c=>{
-        const rad = c.el.offsetWidth/2;
-        c.el.style.transform = `translate(${c.x - rad}px,${c.y - rad}px)`;
-      });
+      circles.forEach(c=>{ const rad=c.el.offsetWidth/2; c.el.style.transform=`translate(${c.x-rad}px,${c.y-rad}px)`; });
       requestAnimationFrame(loop);
     }
   </script>
